@@ -39,8 +39,22 @@ that default path and fail if it is overridden.
 - Lint: `npm run lint`. It currently reports many pre-existing Prettier violations on `main`; CI only runs
   `npm run build` (see `.github/workflows/build-admin-on-pr.yml`), not lint, so lint is not kept clean.
 
-### Docker is optional for development
+### Docker
 The app talks to Docker via `dockerode` (`/var/run/docker.sock`) to install/run the offline tool
-containers. Docker is **not** required to boot the Command Center or to lint/test/build — boot logs a
-harmless `connect ENOENT /var/run/docker.sock` error when Docker is absent. Only the tool-install/run
-features need a Docker daemon.
+containers **and** to run the System Benchmark (it runs `severalnines/sysbench` in a container). Docker is
+**not** required to boot the Command Center or to lint/test/build — boot logs a harmless
+`connect ENOENT /var/run/docker.sock` error when Docker is absent — but the benchmark and any
+tool-install/run features need a running Docker daemon.
+
+Docker (v29) is installed in the image and configured for Docker-in-Docker with `fuse-overlayfs`
+(`/etc/docker/daemon.json` sets the `fuse-overlayfs` storage driver and disables the
+`containerd-snapshotter`, which is required on Docker 29; `iptables` is switched to the legacy backend).
+The daemon does **not** auto-start; start it and make the socket reachable by the app user (`ubuntu`):
+
+```bash
+sudo dockerd &                          # or run in its own terminal/tmux window
+sudo chmod 666 /var/run/docker.sock     # daemon recreates the socket as root:docker (mode 660) on start
+```
+
+`ubuntu` is already a member of the `docker` group, but the `chmod` is the reliable in-session fix because
+group changes need a fresh login. The System Benchmark uses the `severalnines/sysbench:latest` image.
