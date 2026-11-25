@@ -45,7 +45,10 @@ const bodyParserConfig = defineConfig({
 
     /**
      * Maximum limit of data to parse including all files
-     * and fields
+     * and fields. Sized for Knowledge Base uploads (~100 MB).
+     * ZIM sideloads (`/api/zim/upload`, processManually) override this
+     * per-request via `multipart.process({ limit: ZIM_UPLOAD_MULTIPART_LIMIT })`
+     * — do not raise the global ceiling just for ZIMs.
      */
     limit: '110mb', // Set to 110MB to allow for some overhead beyond the 100MB file size limit
     types: ['multipart/form-data'],

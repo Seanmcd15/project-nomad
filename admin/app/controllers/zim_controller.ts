@@ -14,6 +14,7 @@ import { createWriteStream } from 'fs'
 import { rename } from 'fs/promises'
 import { join, resolve, sep } from 'path'
 import { ZIM_STORAGE_PATH, ensureDirectoryExists, sanitizeFilename } from '../utils/fs.js'
+import { ZIM_UPLOAD_MULTIPART_LIMIT } from '../../constants/zim_upload.js'
 
 @inject()
 export default class ZimController {
@@ -137,7 +138,9 @@ export default class ZimController {
         tmpPath = null
       })
 
-      await request.multipart.process()
+      // Override the global 110mb multipart ceiling — ZIM archives are multi-GB.
+      // See ZIM_UPLOAD_MULTIPART_LIMIT / constants/zim_upload.ts.
+      await request.multipart.process({ limit: ZIM_UPLOAD_MULTIPART_LIMIT })
 
       if (uploadError === 'INVALID_TYPE') {
         return response.status(422).send({ message: 'Only .zim files are accepted' })
@@ -159,11 +162,16 @@ export default class ZimController {
         filename,
         added,
       })
-    } catch (error) {
+    } catch (error: any) {
       logger.error('[ZimController] Upload failed:', error)
       if (tmpPath) {
         const { unlink } = await import('fs/promises')
         await unlink(tmpPath).catch(() => {})
+      }
+      if (error?.code === 'E_REQUEST_ENTITY_TOO_LARGE') {
+        return response.status(413).send({
+          message: `ZIM file exceeds the ${ZIM_UPLOAD_MULTIPART_LIMIT} upload limit. Copy larger files directly into the ZIM storage volume and use Rescan Library.`,
+        })
       }
       return response.status(500).send({ message: 'Upload failed' })
     }
